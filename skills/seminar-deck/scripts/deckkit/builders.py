@@ -36,18 +36,23 @@ class Builders(Deck):
         return max(8, round(pt * self.font_k))
 
     # ---------------------------------------------------------- base slides
-    def content(self, title: str, source: Optional[str] = None, url: Optional[str] = None):
-        """Light slide with a title (and a citation line when given)."""
+    def content(self, title: str, source: Optional[str] = None, url: Optional[str] = None,
+                kicker: Optional[str] = None):
+        """Light slide with a title (and a citation line when given). `kicker` is the label above
+        the title: None = the current block's, '' = none."""
         t = self.theme
         s = self.new_slide()
         self.text(s, *t.title_box, title, size=t.title_size, color=t.c("title"), font=t.title_font)
+        self.add_kicker(s, kicker)
         if source:
             self.cite(s, source, url)
         return s
 
-    def divider(self, kicker: str, title: str, sub: str = ""):
+    def divider(self, kicker: str, title: str, sub: str = "", number: Optional[int] = None):
+        """Section slide. A `number` starts block `number`: its label goes onto the following
+        content slides, and with `self.blocks` set a row of pills shows where the talk is."""
         t = self.theme
-        s = self.new_slide(dark=True)
+        s = self.new_slide(dark=True, kind="divider")
         self.text(s, *self.u(0.94, 2.74, 11.44, 0.30), kicker, size=self.fs(14), color=t.c("accent2"),
                   align=PP_ALIGN.CENTER, spc=200)
         self.text(s, *self.u(0.94, 3.26, 11.44, 0.90), title, size=self.fs(54), color=t.c("gold"),
@@ -55,6 +60,9 @@ class Builders(Deck):
         if sub:
             self.text(s, *self.u(1.66, 4.39, 10.01, 0.80), sub, size=self.fs(20), color=t.c("on_dark"),
                       align=PP_ALIGN.CENTER)
+        if number is not None:
+            self.enter_block(number, self.blocks[number - 1] if 0 < number <= len(self.blocks) else title, s)
+            self.block_pills(s, t.width / 2, self.u(5.75), anchor="center")
         return s
 
     def takeaway(self, s, label: str, body: str, y: float = 5.35, h: float = 0.62):
@@ -149,8 +157,8 @@ class Builders(Deck):
         return s
 
     def closing(self, title: str = "Thank you for your attention!", picture: Optional[str] = None):
-        t = self.theme
-        s = self.content(title)
+        s = self.content(title, kicker="")
+        self.mark(s, "closing")
         if picture:
             self.picture(s, picture, *self.u(3.47, 1.62, 6.4, 5.0))
         return s

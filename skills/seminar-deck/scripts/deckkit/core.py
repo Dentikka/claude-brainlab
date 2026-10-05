@@ -4,9 +4,14 @@ A deck is regenerated from a build script every time; nothing is edited by hand 
 .pptx. Every helper takes a `Deck`, whose `theme` carries the colours, fonts and the
 geometry of the title and citation lines, so the same builders serve the lab style and a
 co-author's style.
+
+Navigation: a numbered divider starts a block; every content slide after it carries the
+block's label above the title, and with `deck.blocks` set the dividers show a row of pills
+("you are here"). Pills, agenda cards and labels become clickable jumps at save time.
 """
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Sequence, Tuple
 
@@ -21,7 +26,11 @@ from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
 from pptx.oxml.ns import qn
 from pptx.util import Inches, Pt
 
-__all__ = ["Theme", "Deck", "rgb", "arxiv_abs", "arxiv_pdf"]
+from . import checks
+
+__all__ = ["Theme", "Deck", "rgb", "arxiv_abs", "arxiv_pdf", "nav_pills"]
+
+logger = logging.getLogger(__name__)
 
 Box = Tuple[float, float, float, float]  # x, y, w, h in inches
 
@@ -39,6 +48,46 @@ def arxiv_abs(aid: str) -> str:
 
 def arxiv_pdf(aid: str) -> str:
     return f"https://arxiv.org/pdf/{aid}"
+
+
+def nav_pills(slide, x: float, y: float, labels: Sequence[str], current: int, *, font: str,
+              colors: Dict[str, Tuple[Optional[str], str]], line: str, size: float = 9, h: float = 0.24,
+              gap: float = 0.08, w: Optional[float] = None, anchor: str = "left") -> list:
+    """'You are here': one pill per block, blocks before `current` (0-based) 'done', the current
+    one 'here', the rest 'ahead'. `colors[state] = (fill or None, text)`; `line` outlines the
+    pills without a fill. `anchor` says what x is: the left edge, the right edge or the centre
+    of the row. Works on any slide, including a course-template divider. Returns the pill
+    shapes (for clickable jumps)."""
+    widths = [w or max(0.42, 0.075 * len(lab) * size / 9 + 0.22) for lab in labels]
+    total = sum(widths) + gap * (len(labels) - 1)
+    cx = {"left": x, "right": x - total, "center": x - total / 2}[anchor]
+    shapes = []
+    for i, (lab, pw) in enumerate(zip(labels, widths)):
+        state = "done" if i < current else ("here" if i == current else "ahead")
+        fill, ink = colors[state]
+        sh = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(cx), Inches(y), Inches(pw), Inches(h))
+        sh.adjustments[0] = 0.5
+        sh.shadow.inherit = False
+        if fill:
+            sh.fill.solid()
+            sh.fill.fore_color.rgb = rgb(fill)
+            sh.line.fill.background()
+        else:
+            sh.fill.background()
+            sh.line.color.rgb = rgb(line)
+            sh.line.width = Pt(0.75)
+        tf = sh.text_frame
+        tf.margin_left = tf.margin_right = tf.margin_top = tf.margin_bottom = 0
+        tf.vertical_anchor = MSO_ANCHOR.MIDDLE
+        p = tf.paragraphs[0]
+        p.alignment = PP_ALIGN.CENTER
+        r = p.add_run()
+        r.text = lab
+        r.font.name, r.font.size, r.font.bold = font, Pt(size), state == "here"
+        r.font.color.rgb = rgb(ink)
+        shapes.append(sh)
+        cx += pw + gap
+    return shapes
 
 
 @dataclass(frozen=True)
@@ -71,6 +120,14 @@ class Deck:
     theme: Theme
     layout_index: int = 0
     notes: Dict[str, str] = field(default_factory=dict)  # slide title -> speaker notes
+    blocks: List[str] = field(default_factory=list)      # short block names, in order: agenda and pills
+    auto_kicker: bool = True                             # block label above the title of content slides
+
+    def __post_init__(self):
+        self._block: Optional[Tuple[int, str]] = None    # current block (number, name)
+        self._targets: Dict[tuple, object] = {}          # ("block", n) / ("agenda",) -> slide
+        self._links: List[tuple] = []                    # (slide, shape, target key)
+        self._title_meta: Optional[dict] = None          # set by a title builder that knows names and date
 
     # ------------------------------------------------------------------ slides
     @classmethod
@@ -81,8 +138,11 @@ class Deck:
         idx = 6 if not template and len(prs.slide_layouts) > 6 else 0  # 6 = 'Blank' in the default master
         return cls(prs, theme, idx)
 
-    def new_slide(self, dark: bool = False, bg: Optional[str] = None, logo: bool = True):
+    def new_slide(self, dark: bool = False, bg: Optional[str] = None, logo: bool = True, kind: str = "content"):
+        """`kind` (content, title, divider, meme, closing) is stored in the slide name, where
+        the checks read it: only content slides must have speaker notes."""
         s = self.prs.slides.add_slide(self.prs.slide_layouts[self.layout_index])
+        s._element.cSld.set("name", checks.TAG + kind)
         for ph in list(s.placeholders):  # builders draw everything themselves
             ph._element.getparent().remove(ph._element)
         s.background.fill.solid()
@@ -91,11 +151,77 @@ class Deck:
             self.add_logo(s, dark)
         return s
 
+    def mark(self, s, kind: str) -> None:
+        """Re-label a slide's kind (e.g. a closing built on a content slide)."""
+        s._element.cSld.set("name", checks.TAG + kind)
+
     def add_logo(self, s, dark: bool = False) -> None:
         spec = self.theme.logo_dark if dark else self.theme.logo
         if spec:
             path, (x, y, w, h) = spec
             s.shapes.add_picture(path, Inches(x), Inches(y), Inches(w), Inches(h))
+
+    # -------------------------------------------------------------- navigation
+    def enter_block(self, number: int, name: str, divider_slide=None) -> None:
+        """Start block `number`: later content slides carry its label; the divider is the
+        target of the jumps to this block."""
+        self._block = (number, name)
+        if divider_slide is not None:
+            self._targets[("block", number)] = divider_slide
+
+    def kicker_text(self) -> Optional[str]:
+        if not self._block:
+            return None
+        n, name = self._block
+        return f"{n:02d} · {name.upper()}"
+
+    def add_kicker(self, s, label: Optional[str] = None):
+        """Block label above the title (None = the current block; '' = none). Click -> agenda."""
+        label = self.kicker_text() if label is None and self.auto_kicker else label
+        if not label:
+            return None
+        t = self.theme
+        x, y, w, _ = t.title_box
+        k = t.width / 10
+        box = self.text(s, x, y - 0.26 * k, w, 0.22 * k, label, size=round(9 * k), bold=True,
+                        color=t.c("accent"), spc=200)
+        self.link(s, box, ("agenda",))
+        return box
+
+    def pill_colors(self, dark: bool = True):
+        """(colors, line) for nav_pills from the theme: on a dark slide or a light one."""
+        c = self.theme.c
+        if dark:
+            return ({"done": (c("muted_dark"), c("bg_dark")), "here": (c("accent2"), c("ink")),
+                     "ahead": (None, c("muted_dark"))}, c("muted_dark"))
+        return ({"done": (c("muted"), c("bg")), "here": (c("accent"), c("bg")), "ahead": (None, c("muted"))},
+                c("muted"))
+
+    def block_pills(self, s, x: float, y: float, anchor: str = "left", dark: bool = True, size: float = 9):
+        """Pills for `self.blocks` with the current block lit; each jumps to its block's divider."""
+        if not self.blocks or not self._block:
+            return []
+        colors, line = self.pill_colors(dark)
+        k = self.theme.width / 10
+        shapes = nav_pills(s, x, y, [f"{i:02d}" for i in range(1, len(self.blocks) + 1)], self._block[0] - 1,
+                           font=self.theme.font, colors=colors, line=line, size=round(size * k),
+                           h=0.24 * k, gap=0.08 * k, w=0.42 * k, anchor=anchor)
+        for i, sh in enumerate(shapes, 1):
+            self.link(s, sh, ("block", i))
+        return shapes
+
+    def link(self, s, shape, key: tuple) -> None:
+        """Make `shape` jump to the slide registered under `key` (resolved at save time)."""
+        self._links.append((s, shape, key))
+
+    def _resolve_links(self) -> None:
+        present = {sl.slide_id for sl in self.prs.slides}
+        for s, shape, key in self._links:
+            target = self._targets.get(key)
+            if target is None or target.slide_id not in present or s.slide_id not in present:
+                continue
+            if target.slide_id != s.slide_id:
+                shape.click_action.target_slide = target
 
     # -------------------------------------------------------------- primitives
     def text(self, s, x, y, w, h, runs, size=None, color=None, font=None, bold=False,
@@ -283,7 +409,7 @@ class Deck:
              labels: Sequence[Tuple[float, float, float, float, str, int, str]]):
         """A meme on its own slide: picture at (x, y), width w; labels in image fractions
         (fx, fy, fw, fh, text, size, 'white'|'dark'). White labels get a dark outline."""
-        s = self.new_slide()
+        s = self.new_slide(kind="meme")
         iw, ih = Image.open(img).size
         h = w * ih / iw
         s.shapes.add_picture(img, Inches(x), Inches(y), Inches(w), Inches(h))
@@ -296,6 +422,11 @@ class Deck:
         return s
 
     # ------------------------------------------------------- notes and order
+    def note(self, s, text: str):
+        """Speaker notes written next to the slide's code: they survive a renamed title."""
+        s.notes_slide.notes_text_frame.text = text.strip()
+        return s
+
     def apply_notes(self, skip_ids: Optional[set] = None) -> int:
         """Speaker notes keyed by the exact title text of a slide; slides in skip_ids
         (e.g. a co-author's) keep their own notes."""
@@ -322,5 +453,18 @@ class Deck:
         for el in keep:
             lst.append(el)
 
-    def save(self, path: str) -> None:
+    # ----------------------------------------------------------------- save
+    def preflight(self) -> List[str]:
+        """Problems to fix before the deck is shown (see deckkit.checks): date and names on the
+        title slide, speaker notes on our content slides, duplicate titles, wording. A
+        co-author's slides (not built here) are not checked."""
+        return checks.report(self.prs, only_tagged=True, title_meta=self._title_meta)
+
+    def save(self, path: str, check: bool = True) -> List[str]:
+        """Resolve the clickable jumps, report preflight problems as warnings, write the file."""
+        self._resolve_links()
+        problems = self.preflight() if check else []
+        for msg in problems:
+            logger.warning("preflight: %s", msg)
         self.prs.save(path)
+        return problems

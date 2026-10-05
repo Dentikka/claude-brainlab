@@ -149,7 +149,7 @@ here. Per-skill detail for all 75 skills is in [`SKILLS.md`](SKILLS.md).
 - **Obsidian integration** — hard-link rule for the same paper in multiple folders, project-memory bootstrap, experiment log, daily research log, link-graph repair, synthesis maps.
 - **MemPalace integration** — durable conversation memory with auto-save on every turn (off by default for new installs).
 - **`presentation`** — Beamer-first slide skill with a built-in **terminal-style** theme (dark, monospace, bright-green accent). One source of truth for talks, posters and promotion content.
-- **`seminar-deck`** — talks and lectures as `.pptx` decks built from code (python-pptx) in the Brain Lab house style: plan first, numbers checked against the papers, speaker notes, PowerPoint render checks.
+- **`seminar-deck`** — talks and lectures as `.pptx` decks built from code (python-pptx) in the Brain Lab house style: plan first, numbers checked against the papers, navigation on every deck, speaker notes, preflight and layout checks through PowerPoint.
 
 ## Evidence-first paper review and rebuttal
 

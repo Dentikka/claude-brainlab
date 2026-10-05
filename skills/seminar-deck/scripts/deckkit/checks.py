@@ -8,7 +8,7 @@
 
 The kind of a slide comes from the tag `deckkit:<kind>` that the builders put into the slide
 name, else from the layout name (course template codes, default layouts), else from the look
-(a picture over a third of the slide with little text is a meme), else "content".
+(a picture over a fifth of the slide with little text is a meme), else "content".
 """
 from __future__ import annotations
 
@@ -59,10 +59,11 @@ WORDING = [
 
 
 def _looks_like_meme(slide) -> bool:
-    """A picture over a third of the slide and little text: a meme built without a tag."""
+    """A picture over a fifth of the slide and little text: a meme built without a tag (a square
+    or upright meme on a 16:9 slide covers a quarter to a third of it)."""
     prs = slide.part.package.presentation_part.presentation
     area = prs.slide_width * prs.slide_height
-    big = any(sh.shape_type == MSO_SHAPE_TYPE.PICTURE and sh.width * sh.height >= area / 3 for sh in slide.shapes)
+    big = any(sh.shape_type == MSO_SHAPE_TYPE.PICTURE and sh.width * sh.height >= area / 5 for sh in slide.shapes)
     return big and len(slide_text(slide)) < 150
 
 

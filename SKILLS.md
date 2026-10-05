@@ -87,6 +87,16 @@ The core research loop: get a paper into your library with a real, audited note.
   Russian prose by default, and treats overflow/heavy shrink as errors. Ships a built-in
   **terminal style** (dark, monospace, bright-green accent). *Fires on:* "make slides /
   rewrite this deck / use terminal style".
+- **`seminar-deck`** ⭐ — Talks and lectures as PowerPoint decks built from code
+  (python-pptx): one build script regenerates the whole `.pptx`, so every edit is
+  repeatable and a co-author's new version merges by rebuilding. The plan comes first and is
+  made together with the user; every number on a slide is checked against the paper, and a
+  venue appears only when confirmed. Ships `deckkit` with the Brain Lab house style (capsule
+  cards, molecule mark), a course-template mode and a co-author's-style mode, speaker notes
+  keyed by slide title, PowerPoint rendering with contact sheets for visual checks, a font
+  check and a safety check for downloaded images. Rendering needs Windows with PowerPoint.
+  *Fires on:* "prepare a seminar / reading club / lecture deck", "add a slide about this
+  paper", "speaker notes".
 - **`paper-to-social`** ⭐ — Turn a paper into copy-paste-ready social posts (Telegram,
   Twitter/X, Habr), with figures pulled from the arXiv version, in your own voice (never
   AI-sounding). *Fires on:* "make a post about this paper / promote this paper".

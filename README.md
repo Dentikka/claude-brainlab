@@ -124,7 +124,7 @@ together with a token for the shared knowledge base.
 |---|---|
 | **Literature** | `paper-ingest`, `paper-search`, `want-2-read`, `obsidian-literature-workflow`, `zotero-obsidian-bridge`, `citation-verification` |
 | **Experiments** | `results-analysis`, `results-report`, `obsidian-experiment-log`, `handoff-to-jarvis`, `diagnose`, `verification-loop` |
-| **Writing** | `ml-paper-writing`, `new-paper`, `writing-anti-ai`, `presentation`, `paper-to-social` |
+| **Writing** | `ml-paper-writing`, `new-paper`, `writing-anti-ai`, `presentation`, `seminar-deck`, `paper-to-social` |
 | **Review** | `astar-paper-review`, `review-response`, `grill-me`, `grill-with-docs` |
 | **Knowledge** | `lab-knowledge`, `lab-project-onboarding`, `call-notes`, `create-project`, `obsidian-project-memory`, `obsidian-synthesis-map` |
 | **Engineering** | `code-ingest`, `code-library`, `code-review-excellence`, `tdd`, `bug-detective`, `git-workflow`, `uv-package-manager` |
@@ -149,6 +149,7 @@ here. Per-skill detail for all 75 skills is in [`SKILLS.md`](SKILLS.md).
 - **Obsidian integration** — hard-link rule for the same paper in multiple folders, project-memory bootstrap, experiment log, daily research log, link-graph repair, synthesis maps.
 - **MemPalace integration** — durable conversation memory with auto-save on every turn (off by default for new installs).
 - **`presentation`** — Beamer-first slide skill with a built-in **terminal-style** theme (dark, monospace, bright-green accent). One source of truth for talks, posters and promotion content.
+- **`seminar-deck`** — talks and lectures as `.pptx` decks built from code (python-pptx) in the Brain Lab house style: plan first, numbers checked against the papers, speaker notes, PowerPoint render checks.
 
 ## Evidence-first paper review and rebuttal
 

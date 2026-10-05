@@ -4,6 +4,9 @@ Tokens and geometry follow references/lab-brand.md (official template: 16:9, 10 
 Trebuchet MS, maroon/cream/blue/gold). Signature elements: the card with a blue capsule tab,
 the molecule "B" mark in the footer, oversized section numbers, molecule accent on the
 title and closing slides, page numbers on content slides only.
+
+Navigation: `agenda()` after the title (one card per block), a numbered `divider()` per block
+with pills in the upper right, and the block's label above the title of every content slide.
 """
 from __future__ import annotations
 
@@ -65,14 +68,49 @@ class LabDeck(Builders):
         self.text(s, W - 1.1, H - 0.5, 0.7, 0.3, str(self._page), size=11,
                   color=self.theme.c("muted_dark" if dark else "muted"), align=PP_ALIGN.RIGHT)
 
-    def content(self, title: str, source: Optional[str] = None, url: Optional[str] = None, page: bool = True):
+    def content(self, title: str, source: Optional[str] = None, url: Optional[str] = None, page: bool = True,
+                kicker: Optional[str] = None):
+        """Content slide; `kicker` is the label above the title (None = the current block's,
+        '' = none)."""
         t = self.theme
         s = self.new_slide()
         self.text(s, *t.title_box, title, size=t.title_size, color=t.c("title"), bold=True)
+        self.add_kicker(s, kicker)
         if source:
             self.cite(s, source, url)
         if page:
             self.page_number(s)
+        return s
+
+    def agenda(self, title: str = "Roadmap", lead: str = "", blocks: Optional[Sequence[str]] = None,
+               current: Optional[int] = None):
+        """Map of the talk: a numbered capsule card per block. Right after the title no block is
+        lit; repeated mid-talk, the current block is gold. Cards jump to their dividers, and the
+        block labels of content slides jump back here. `blocks` also sets `self.blocks`."""
+        t = self.theme
+        if blocks:
+            self.blocks = list(blocks)
+        names = self.blocks
+        current = current if current is not None else (self._block[0] if self._block else None)
+        s = self.content(title)
+        self._targets.setdefault(("agenda",), s)
+        if lead:
+            self.text(s, 0.55, 1.15, 8.9, 0.35, lead, size=t.lead_size, color=t.c("title"))
+        n = len(names)
+        cols = 1 if n <= 4 else (3 if n <= 9 else 4)       # a short talk reads as a list
+        rows = -(-n // cols)
+        y0, gx, gy = (1.80 if lead else 1.45), 0.18, 0.32
+        w = (8.9 - gx * (cols - 1)) / cols
+        h = min(0.9, (4.95 - y0 - gy * (rows - 1)) / rows)
+        for i, name in enumerate(names):
+            x, y = 0.55 + (w + gx) * (i % cols), y0 + (h + gy) * (i // cols)
+            first = len(s.shapes)
+            self.card(s, x, y, w, h, t.c("gold") if current == i + 1 else t.c("card"), radius=0.08)
+            self.capsule(s, x + 0.18, y - 0.15, f"{i + 1:02d}", w=0.62)
+            self.text(s, x + 0.22, y + 0.24, w - 0.4, h - 0.3, name, size={1: 15, 3: 13}.get(cols, 12), bold=True,
+                      color=t.c("deep"), anchor=MSO_ANCHOR.MIDDLE)
+            for sh in list(s.shapes)[first:]:
+                self.link(s, sh, ("block", i + 1))
         return s
 
     # ------------------------------------------------------ house elements
@@ -125,8 +163,11 @@ class LabDeck(Builders):
 
     # ---------------------------------------------------------- dark slides
     def title_slide(self, title: str, subtitle: str = "", kicker: str = "", date: str = "", speakers: str = ""):
+        """Title: speaker names as they spell them in Latin script and the date of the talk
+        (not of the build). Missing either is reported when the deck is saved."""
         t = self.theme
-        s = self.new_slide(dark=True, logo=False)
+        s = self.new_slide(dark=True, logo=False, kind="title")
+        self._title_meta = {"date": date, "speakers": speakers}
         lw = 0.58 * 2500 / 779
         s.shapes.add_picture(asset("logo-light.png"), Inches(0.55), Inches(0.5), Inches(lw), Inches(0.58))
         self.picture(s, asset("molecule-node.png"), 6.95, 1.4, 2.7, 2.9)
@@ -141,9 +182,11 @@ class LabDeck(Builders):
         return s
 
     def divider(self, kicker: str, title: str, sub: str = "", number: Optional[int] = None):
-        """Section slide: oversized number upper-left, title lower; kicker and sub optional."""
+        """Section slide: oversized number upper-left, title lower; kicker and sub optional.
+        A `number` starts that block (its label goes onto the following content slides); with
+        `self.blocks` set, pills in the upper right show where the talk is."""
         t = self.theme
-        s = self.new_slide(dark=True)
+        s = self.new_slide(dark=True, kind="divider")
         if number is not None:
             self.text(s, 0.55, 0.55, 3.2, 1.6, f"{number:02d}", size=96, bold=True, color=t.c("deep"))
         if kicker:
@@ -151,13 +194,16 @@ class LabDeck(Builders):
         self.text(s, 0.6, 2.7, 8.7, 1.1, title, size=32, bold=True, color=t.c("on_dark"))
         if sub:
             self.text(s, 0.6, 3.85, 8.0, 0.8, sub, size=15, color=t.c("muted_dark"))
+        if number is not None:
+            self.enter_block(number, self.blocks[number - 1] if 0 < number <= len(self.blocks) else title, s)
+            self.block_pills(s, W - 0.55, 0.62, anchor="right")
         return s
 
     def closing(self, title: str = "Thank you for your attention!", lines: Sequence[str] = (),
                 picture: Optional[str] = None):
         """Maroon closing; a meme `picture` replaces the molecule cluster when given."""
         t = self.theme
-        s = self.new_slide(dark=True, logo=False)
+        s = self.new_slide(dark=True, logo=False, kind="closing")
         lw = 0.58 * 2500 / 779
         s.shapes.add_picture(asset("logo-light.png"), Inches(0.55), Inches(0.5), Inches(lw), Inches(0.58))
         self.text(s, 0.6, 2.2 if picture else 2.7, 5.4 if picture else 5.95, 1.0, title, size=30, bold=True,

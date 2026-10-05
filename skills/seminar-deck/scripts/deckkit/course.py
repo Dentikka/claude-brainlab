@@ -12,15 +12,20 @@ Two template defects are handled here:
 from __future__ import annotations
 
 import io
+import logging
 import os
 import zipfile
-from typing import Dict, Optional, Union
+from typing import Dict, List, Optional, Union
 
 from PIL import Image
 from pptx import Presentation
 from pptx.util import Emu
 
+from . import checks
+
 __all__ = ["potx_to_pptx", "ensure_notes_master", "open_course", "dump_layouts", "CourseDeck"]
+
+logger = logging.getLogger(__name__)
 
 COURSE_TEMPLATE_ENV = "DECKKIT_COURSE_TEMPLATE"   # path to the course .potx when none is passed
 
@@ -84,11 +89,16 @@ def dump_layouts(prs: Presentation) -> str:
 
 
 class CourseDeck:
-    """Fill course layouts by code: deck.slide("C-01", {0: title, 3: lead}, {7: "fig.png"}, notes)."""
+    """Fill course layouts by code: deck.slide("C-01", {0: title, 3: lead}, {7: "fig.png"}, notes).
 
-    def __init__(self, prs: Presentation):
+    Navigation: set `deck.kicker = "BLOCK 6 · BIASES IN THE GRPO LOSS"` at each divider, and
+    every C- slide gets it in its kicker placeholder (idx 1) unless the call fills idx 1 itself.
+    Pills on an F-04 divider: `deckkit.core.nav_pills` with the template's colours."""
+
+    def __init__(self, prs: Presentation, kicker: Optional[str] = None):
         self.prs = prs
         self.layouts = {l.name.split(" ")[0]: l for l in prs.slide_masters[0].slide_layouts}
+        self.kicker = kicker
 
     @staticmethod
     def _fill(tf, value: Union[str, list]) -> None:
@@ -108,11 +118,16 @@ class CourseDeck:
         ph._element.getparent().remove(ph._element)
 
     def slide(self, code: str, texts: Optional[Dict[int, Union[str, list]]] = None,
-              pics: Optional[Dict[int, str]] = None, notes: Optional[str] = None):
+              pics: Optional[Dict[int, str]] = None, notes: Optional[str] = None, kind: Optional[str] = None):
         """Placeholders not given text or a picture are removed, so no empty prompt text
-        ('Click to add title') survives into the deck."""
+        ('Click to add title') survives into the deck. `kind` ('meme', 'break', ...) marks a
+        slide that needs no speaker notes when the layout name does not say so."""
         s = self.prs.slides.add_slide(self.layouts[code])
-        texts, pics = texts or {}, pics or {}
+        texts, pics = dict(texts or {}), pics or {}
+        if self.kicker and code.startswith("C-") and 1 not in texts and 1 not in pics:
+            texts[1] = self.kicker
+        if kind:
+            s._element.cSld.set("name", checks.TAG + kind)
         for ph in list(s.placeholders):
             idx = ph.placeholder_format.idx
             if idx in pics:
@@ -125,5 +140,16 @@ class CourseDeck:
             s.notes_slide.notes_text_frame.text = notes
         return s
 
-    def save(self, path: str) -> None:
+    @staticmethod
+    def note(slide, text: str):
+        """Speaker notes next to the slide's code."""
+        slide.notes_slide.notes_text_frame.text = text.strip()
+        return slide
+
+    def save(self, path: str, check: bool = True) -> List[str]:
+        """Write the deck; report the preflight problems of deckkit.checks as warnings."""
+        problems = checks.report(self.prs) if check else []
+        for msg in problems:
+            logger.warning("preflight: %s", msg)
         self.prs.save(path)
+        return problems

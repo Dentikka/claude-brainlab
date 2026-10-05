@@ -92,9 +92,13 @@ The core research loop: get a paper into your library with a real, audited note.
   repeatable and a co-author's new version merges by rebuilding. The plan comes first and is
   made together with the user; every number on a slide is checked against the paper, and a
   venue appears only when confirmed. Ships `deckkit` with the Brain Lab house style (capsule
-  cards, molecule mark), a course-template mode and a co-author's-style mode, speaker notes
-  keyed by slide title, PowerPoint rendering with contact sheets for visual checks, a font
-  check and a safety check for downloaded images. Rendering needs Windows with PowerPoint.
+  cards, molecule mark), a course-template mode and a co-author's-style mode; navigation on
+  every deck (an agenda, "you are here" pills on block dividers, the block's label above each
+  title, click jumps between them); speaker notes next to each slide; preflight checks on save
+  and on any `.pptx` (date and names on the title slide, notes on content slides, duplicate
+  titles, "not X but Y" wording); PowerPoint rendering with a layout report (overflowing text,
+  wrapped titles, off-slide shapes), PDF export, a font check and a safety check for downloaded
+  images. Rendering needs Windows with PowerPoint.
   *Fires on:* "prepare a seminar / reading club / lecture deck", "add a slide about this
   paper", "speaker notes".
 - **`paper-to-social`** ⭐ — Turn a paper into copy-paste-ready social posts (Telegram,

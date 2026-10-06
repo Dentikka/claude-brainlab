@@ -1,7 +1,8 @@
 """Preflight checks on any .pptx, whoever built it: a date on the title slide, speaker notes on
 content slides, duplicate titles, wording (no "not X but Y", no rating of the material, no
-talk about the audience or delivery instructions on a slide). With --outline, first a table
-of contents: number, kind, layout, notes length, title.
+talk about the audience or delivery instructions on a slide), memes (about five per talk, one
+per block at most). With --outline, first a table of contents: number, kind, layout, notes
+length, title.
 
     python deck_check.py deck.pptx
     python deck_check.py deck.pptx --outline

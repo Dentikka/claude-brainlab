@@ -4,7 +4,8 @@
 - every content slide has speaker notes (title, dividers, memes, breaks, closing need none);
 - no two content slides share a title (notes are keyed by title; the audience gets lost);
 - wording: no "not X but Y" aphorisms, no rating of the material itself, no talk about the
-  audience in the third person and no delivery instructions on a slide (they go to the notes).
+  audience in the third person and no delivery instructions on a slide (they go to the notes);
+- memes: about five per two-hour talk (warns above six), at most one per block.
 
 The kind of a slide comes from the tag `deckkit:<kind>` that the builders put into the slide
 name, else from the layout name (course template codes, default layouts), else from the look
@@ -23,6 +24,8 @@ __all__ = ["slide_kind", "slide_title", "slide_text", "has_date", "missing_notes
 TAG = "deckkit:"
 SERVICE = {"title", "divider", "meme", "break", "closing"}
 SERVICE_LAYOUT = re.compile(r"·\s*Title\s*·|Section divider|\bBreak\b|\bClosing\b|^Title Slide$|^Section Header$")
+DIVIDER_LAYOUT = re.compile(r"Section divider|^Section Header$")
+MAX_MEMES = 6          # about five per two-hour talk, at most one per block
 
 _MONTHS_EN = "January|February|March|April|May|June|July|August|September|October|November|December"
 _MONTHS_RU = "января|февраля|марта|апреля|мая|июня|июля|августа|сентября|октября|ноября|декабря"
@@ -132,6 +135,19 @@ def duplicate_titles(prs, only_tagged: bool = False) -> List[Tuple[str, List[int
     return [(t, ix) for t, ix in seen.items() if t and len(ix) > 1]
 
 
+def memes_by_block(prs) -> List[Tuple[int, List[int]]]:
+    """(slide number of the block's divider, 0 before the first one; meme slide numbers)."""
+    blocks: List[Tuple[int, List[int]]] = [(0, [])]
+    for i, sl in enumerate(prs.slides, 1):
+        tagged = (sl._element.cSld.get("name") or "").startswith(TAG)
+        kind = slide_kind(sl)
+        if kind == "divider" or (not tagged and DIVIDER_LAYOUT.search(sl.slide_layout.name or "")):
+            blocks.append((i, []))
+        elif kind == "meme":
+            blocks[-1][1].append(i)
+    return blocks
+
+
 def wording(prs, only_tagged: bool = False) -> List[Tuple[int, str, str]]:
     """Slide text only: delivery instructions are fine in the notes, where they belong.
     One hit per slide and rule."""
@@ -165,4 +181,12 @@ def report(prs, only_tagged: bool = False, title_meta: Optional[dict] = None) ->
         msgs.append(f"same title on slides {', '.join(map(str, ix))}: {title[:60]!r}")
     for i, rule, snippet in wording(prs, only_tagged):
         msgs.append(f"s{i:02d} wording ({rule}): ...{snippet}...")
+    blocks = memes_by_block(prs)
+    total = sum(len(m) for _, m in blocks)
+    if total > MAX_MEMES:
+        msgs.append(f"{total} memes: about five per two-hour talk, the funniest and most fitting")
+    for div, m in blocks:
+        if len(m) > 1:
+            where = f"block at s{div:02d}" if div else "before the first divider"
+            msgs.append(f"{where}: {len(m)} memes ({', '.join(f's{i:02d}' for i in m)}), one per block at most")
     return msgs

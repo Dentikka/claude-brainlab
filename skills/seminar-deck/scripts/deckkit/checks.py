@@ -5,7 +5,11 @@
 - no two content slides share a title (notes are keyed by title; the audience gets lost);
 - wording: no "not X but Y" aphorisms, no rating of the material itself, no talk about the
   audience in the third person and no delivery instructions on a slide (they go to the notes);
-- memes: about five per two-hour talk (warns above six), at most one per block.
+- memes: about five per two-hour talk (warns above six), at most one per block;
+- no block durations on dividers or the map ("9.25 min"): minutes belong to the plan and notes.
+
+Opt-in, not part of `report`: `corner_hits` lists shapes inside a corner kept free for a camera
+inset in a recorded talk. Whether a deck keeps such a corner is the user's decision.
 
 The kind of a slide comes from the tag `deckkit:<kind>` that the builders put into the slide
 name, else from the layout name (course template codes, default layouts), else from the look
@@ -19,13 +23,14 @@ from typing import Iterable, List, Optional, Tuple
 from pptx.enum.shapes import MSO_SHAPE_TYPE, PP_PLACEHOLDER
 
 __all__ = ["slide_kind", "slide_title", "slide_text", "has_date", "missing_notes", "duplicate_titles",
-           "wording", "report", "TAG"]
+           "wording", "report", "corner_hits", "CORNERS", "TAG"]
 
 TAG = "deckkit:"
 SERVICE = {"title", "divider", "meme", "break", "closing"}
 SERVICE_LAYOUT = re.compile(r"·\s*Title\s*·|Section divider|\bBreak\b|\bClosing\b|^Title Slide$|^Section Header$")
 DIVIDER_LAYOUT = re.compile(r"Section divider|^Section Header$")
 MAX_MEMES = 6          # about five per two-hour talk, at most one per block
+DURATION = re.compile(r"\b\d+(?:[.,]\d+)?\s*(?:min|mins|minutes|мин)\b", re.I)
 
 _MONTHS_EN = "January|February|March|April|May|June|July|August|September|October|November|December"
 _MONTHS_RU = "января|февраля|марта|апреля|мая|июня|июля|августа|сентября|октября|ноября|декабря"
@@ -165,6 +170,32 @@ def wording(prs, only_tagged: bool = False) -> List[Tuple[int, str, str]]:
     return out
 
 
+CORNERS = ("tr", "tl", "br", "bl")
+
+
+def corner_hits(prs, corner: str = "tr", frac: float = 0.25) -> List[Tuple[int, str]]:
+    """Shapes (slide's own and its layout's non-placeholder ones) that reach into the corner
+    `corner` of size `frac` of the slide width by `frac` of its height. Opt-in check for a deck
+    the user decided to keep a camera corner in; nothing calls it by default."""
+    assert corner in CORNERS, corner
+    W, H = prs.slide_width, prs.slide_height
+    cw, ch = W * frac, H * frac
+    x0, x1 = (W - cw, W) if corner[1] == "r" else (0, cw)
+    y0, y1 = (0, ch) if corner[0] == "t" else (H - ch, H)
+    eps = 9144                                        # 0.01 in: touching the edge is fine
+    hits = []
+    for i, sl in enumerate(prs.slides, 1):
+        shapes = list(sl.shapes) + [s for s in sl.slide_layout.shapes if not s.is_placeholder]
+        for sh in shapes:
+            if sh.left is None or sh.width is None:
+                continue
+            if sh.left < x1 - eps and sh.left + sh.width > x0 + eps \
+                    and sh.top < y1 - eps and sh.top + sh.height > y0 + eps:
+                text = sh.text_frame.text[:40].replace("\n", " ") if sh.has_text_frame else ""
+                hits.append((i, f"{sh.name[:28]!r} {text!r}"))
+    return hits
+
+
 def report(prs, only_tagged: bool = False, title_meta: Optional[dict] = None) -> List[str]:
     """Human-readable problems; an empty list means the deck passed."""
     msgs = []
@@ -181,6 +212,12 @@ def report(prs, only_tagged: bool = False, title_meta: Optional[dict] = None) ->
         msgs.append(f"same title on slides {', '.join(map(str, ix))}: {title[:60]!r}")
     for i, rule, snippet in wording(prs, only_tagged):
         msgs.append(f"s{i:02d} wording ({rule}): ...{snippet}...")
+    for i, sl in enumerate(prs.slides, 1):
+        tagged = (sl._element.cSld.get("name") or "").startswith(TAG)
+        nav = slide_kind(sl) in ("divider", "agenda") or (not tagged and DIVIDER_LAYOUT.search(sl.slide_layout.name or ""))
+        m = DURATION.search(slide_text(sl)) if nav else None
+        if m:
+            msgs.append(f"s{i:02d} block duration on a navigation slide: {m.group(0)!r} (keep it in the plan)")
     blocks = memes_by_block(prs)
     total = sum(len(m) for _, m in blocks)
     if total > MAX_MEMES:

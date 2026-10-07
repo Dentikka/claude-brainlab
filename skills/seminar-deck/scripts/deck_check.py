@@ -2,10 +2,13 @@
 content slides, duplicate titles, wording (no "not X but Y", no rating of the material, no
 talk about the audience or delivery instructions on a slide), memes (about five per talk, one
 per block at most). With --outline, first a table of contents: number, kind, layout, notes
-length, title.
+length, title. With --camera-corner, also every shape inside that corner (a quarter of the
+width by a quarter of the height by default) — only for a deck where the user decided to keep
+the corner free for a camera inset.
 
     python deck_check.py deck.pptx
     python deck_check.py deck.pptx --outline
+    python deck_check.py deck.pptx --camera-corner tr [--corner-frac 0.25]
 
 Slides built by deckkit carry their kind in the slide name; for other decks the kind comes
 from the layout name (title, divider, break and closing layouts need no notes).
@@ -32,12 +35,18 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("deck")
     ap.add_argument("--outline", action="store_true")
+    ap.add_argument("--camera-corner", choices=checks.CORNERS,
+                    help="corner kept free for a camera inset (only if the user chose one)")
+    ap.add_argument("--corner-frac", type=float, default=0.25)
     a = ap.parse_args()
     prs = Presentation(a.deck)
     if a.outline:
         outline(prs)
         print()
     msgs = checks.report(prs)
+    if a.camera_corner:
+        msgs += [f"s{i:02d} in the camera corner ({a.camera_corner}): {what}"
+                 for i, what in checks.corner_hits(prs, a.camera_corner, a.corner_frac)]
     for m in msgs:
         print(m)
     print(f"checks: {len(msgs)} issue(s)" if msgs else "checks: clean")

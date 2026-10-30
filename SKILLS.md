@@ -61,6 +61,9 @@ The core research loop: get a paper into your library with a real, audited note.
   injection inside PDFs safely. Venue-agnostic. *Fires on:* "review this paper" or a handed PDF.
 - **`review-response`** — Systematic rebuttal workflow: analyze reviewer comments →
   professional response. *Fires on:* "write rebuttal / respond to reviewers".
+- **`rebuttal-compression`** — Fit reviewer responses and Markdown tables into a
+  character budget while preserving evidence, notation and the requested structure.
+  *Fires on:* "сократи на 30% / ужми ребаттл / fit this response into 1500 characters".
 - **`research-ideation`** — Research startup: brainstorm ideas, 5W1H, gap analysis,
   question definition, method selection, planning. *Fires on:* "brainstorm research
   ideas / gap analysis / start a research project".

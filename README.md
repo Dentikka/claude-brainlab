@@ -125,7 +125,7 @@ together with a token for the shared knowledge base.
 | **Literature** | `paper-ingest`, `paper-search`, `want-2-read`, `obsidian-literature-workflow`, `zotero-obsidian-bridge`, `citation-verification` |
 | **Experiments** | `results-analysis`, `results-report`, `obsidian-experiment-log`, `handoff-to-jarvis`, `diagnose`, `verification-loop` |
 | **Writing** | `ml-paper-writing`, `new-paper`, `writing-anti-ai`, `presentation`, `seminar-deck`, `paper-to-social` |
-| **Review** | `astar-paper-review`, `review-response`, `grill-me`, `grill-with-docs` |
+| **Review** | `astar-paper-review`, `review-response`, [`rebuttal-compression`](skills/rebuttal-compression/SKILL.md), `grill-me`, `grill-with-docs` |
 | **Knowledge** | `lab-knowledge`, `lab-project-onboarding`, `call-notes`, `create-project`, `obsidian-project-memory`, `obsidian-synthesis-map` |
 | **Engineering** | `code-ingest`, `code-library`, `code-review-excellence`, `tdd`, `bug-detective`, `git-workflow`, `uv-package-manager` |
 | **Ideas and planning** | `research-ideation`, `planning-with-files`, `zoom-out`, `architecture-design`, `improve-codebase-architecture` |
